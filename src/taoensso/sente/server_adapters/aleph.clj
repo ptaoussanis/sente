@@ -24,13 +24,13 @@
   (when-let [s (get-in ring-req [:headers "upgrade"])]
     (= "websocket" (str/lower-case s))))
 
-(deftype AlephAsyncNetworkChannelAdapter []
+(deftype AlephAsyncNetworkChannelAdapter [options]
   i/IServerChanAdapter
   (ring-req->server-ch-resp [sch-adapter ring-req callbacks-map]
     (let [{:keys [on-open on-close on-msg _on-error]} callbacks-map
           ws? (websocket-req? ring-req)]
       (if ws?
-        (d/chain (aleph/websocket-connection ring-req)
+        (d/chain (aleph/websocket-connection ring-req options)
           (fn [s] ; sch
             (when on-msg   (s/consume     (fn [msg] (on-msg   s ws? msg)) s))
             (when on-close (s/on-closed s (fn []    (on-close s ws? nil))))
@@ -41,4 +41,8 @@
           (when on-open  (do                  (on-open  s ws?)))
           {:body s})))))
 
-(defn get-sch-adapter [] (AlephAsyncNetworkChannelAdapter.))
+(defn get-sch-adapter
+  "Supports websocket-connection options in aleph.http. If no option map is provided,
+  the default options apply."
+  ([] (AlephAsyncNetworkChannelAdapter. nil))
+  ([options] (AlephAsyncNetworkChannelAdapter. options)))
